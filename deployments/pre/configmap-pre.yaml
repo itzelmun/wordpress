@@ -2,15 +2,15 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: import-wordpress-scripts
-  namespace: wordpress
+  namespace: wordpress-pre
 data:
-  creatDataBase.sql: |
-    CREATE DATABASE IF NOT EXISTS proyecto;
-    USE proyecto;
-    CREATE USER 'user'@'%' IDENTIFIED BY 'psswrd-proyecto-user!';
+  wordpress.sql: |
+    CREATE DATABASE IF NOT EXISTS wordpress;
+    USE wordpress;
+    CREATE USER 'user'@'%' IDENTIFIED BY 'user-W0rdPr3sp#5d?w-Ud3}e';
     GRANT ALL PRIVILEGES ON *.* TO 'user'@'%' WITH GRANT OPTION;
     CREATE USER 'read'@'%' IDENTIFIED BY '$read-secure-psswrd&';
-    GRANT SELECT ON proyecto.* TO 'read'@'%';
+    GRANT SELECT ON wordpress.* TO 'read'@'%';
     CREATE USER 'write'@'%' IDENTIFIED BY '=access-for-write-user##';
-    GRANT SELECT, INSERT, UPDATE, DELETE ON proyecto.* TO 'write'@'%';
+    GRANT SELECT, INSERT, UPDATE, DELETE ON wordpress.* TO 'write'@'%';
     FLUSH PRIVILEGES;

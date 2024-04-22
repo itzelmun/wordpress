@@ -31,26 +31,28 @@ spec:
           mountPath: /mnt/public_content
         - name: private-content
           mountPath: /mnt/private_content
+      imagePullSecrets:
+      - name: my-docker-credentials
       containers:
       - name: wordpress
-        image: sistemasudec/wordpress:v1-pre
+        image: udeccolima/wordpress:simplesaml-pre
         imagePullPolicy: Always
         ports:
         - containerPort: 80
         env:
         - name: SOURCE
-          value: wordpress
+          value: pre-wordpress 
         - name: WORDPRESS_DB_HOST
-          value: mysql-wordpress
+          value: mysql-wordpress-pre
         - name: WORDPRESS_DB_NAME
-          value: proyecto
+          value: wordpress
         - name: WORDPRESS_DB_USER
           value: user
         - name: WORDPRESS_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: deploy-secret
-              key: deploy-password
+              name: proyecto-secret
+              key: proyecto-password
         - name: SIMPLE
           value: simple-wordpress
         volumeMounts:

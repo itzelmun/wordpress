@@ -1,4 +1,4 @@
-name: CI/CD on merge to main
+name: CI/CD (production)
 
 on:
   push:
@@ -10,8 +10,8 @@ on:
     types: [closed]
 
 env:
-  DOCKER_IMAGE_NAME1: sistemasudec/wordpress:v1
-  DOCKER_IMAGE_NAME2: sistemasudec/phpmyadmin:wordpress
+  DOCKER_IMAGE_NAME1: udeccolima/wordpress:simplesaml-pre
+  DOCKER_IMAGE_NAME2: udeccolima/phpmyadmin:wordpress-pre
   REMOTE_USER: digesetuser
   REMOTE_HOST: 148.213.1.131
   DEPLOY_PATH: /home/digesetuser/wordpress
@@ -51,35 +51,68 @@ jobs:
 
       - name: Copy Kubernetes Config Files
         run: |
-          scp -o StrictHostKeyChecking=no deployments/*.yaml ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:${{ env.DEPLOY_PATH }}
+          scp -o StrictHostKeyChecking=no deployments/prod/*.yaml ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:${{ env.DEPLOY_PATH }}
+
+      - name: Setup Certificate Files
+        run: |
+            echo "${{ secrets.CERTIFICATE }}" > CRT_ucol.mx.txt
+            echo "${{ secrets.PRIVATE_KEY }}" > RSA_ucol.mx.txt
 
       - name: Apply Kubernetes storage
         uses: myrotvorets/kubectl-action@2.0.0
         with:
             config: ${{ secrets.KUBE_CONFIG_DATA }}
             version: latest
-            args: apply -f deployments/storage.yaml --timeout=120s
+            args: apply -f deployments/prod/storage.yaml --timeout=120s
+
+      - name: Apply Kubernetes configmap
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            version: latest
+            args: apply -f deployments/prod/configmap.yaml --timeout=120s
 
       - name: Apply Kubernetes satefulset
         uses: myrotvorets/kubectl-action@2.0.0
         with:
             config: ${{ secrets.KUBE_CONFIG_DATA }}
             version: latest
-            args: apply -f deployments/statefulset.yaml --timeout=120s
+            args: apply -f deployments/prod/statefulset.yaml --timeout=120s
+
+      - name: Delete Docker-Secret in Prod
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            version: latest
+            args: delete secret my-docker-credentials -n wordpress
+
+      - name: Delete Secret Microbot-data
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            version: latest
+            args: delete secret microbot-data -n wordpress
+
+      - name: Creating certificates and Ingresses
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            version: latest
+            args: create secret tls microbot-data --cert=CRT_ucol.mx.txt --key=RSA_ucol.mx.txt -n wordpress
+
+      - name: Creating Docker-Secret (Prod)
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            version: latest
+            args: create secret docker-registry my-docker-credentials --docker-server=https://index.docker.io/v1/ --docker-username=${{ secrets.DOCKER_USERNAME }} --docker-password=${{ secrets.DOCKER_PASSWORD }} --docker-email=sistemas@ucol.mx -n wordpress
 
       - name: Apply Kubernetes deployments
         uses: myrotvorets/kubectl-action@2.0.0
         with:
             config: ${{ secrets.KUBE_CONFIG_DATA }}
             version: latest
-            args: apply -f deployments/ --timeout=120s
-      
-      - name: Apply Kubernetes configmap
-        uses: myrotvorets/kubectl-action@2.0.0
-        with:
-            config: ${{ secrets.KUBE_CONFIG_DATA }}
-            version: latest
-            args: apply -f deployments/configmap.yaml --timeout=120s
+            args: apply -f deployments/prod/ --timeout=120s
 
       - name: Restart Deployment
         uses: myrotvorets/kubectl-action@2.0.0
@@ -90,7 +123,7 @@ jobs:
 
       - name: Notify Success on Slack
         if: success()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v1.25.0
         with:
             channel-id: 'C06HDV6HZLG' # channel name
             slack-message: "✅ *${{ github.workflow }}* workflow SUCCEEDED for ${{ github.repository }}. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>\nGitHub build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
@@ -99,7 +132,7 @@ jobs:
 
       - name: Notify Failure on Slack
         if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v1.25.0
         with:
             channel-id: 'C06HDV6HZLG' # channel name
             slack-message: "❌ *${{ github.workflow }}* workflow FAILED for ${{ github.repository }}. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>\nGitHub build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"

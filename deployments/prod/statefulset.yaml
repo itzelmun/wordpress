@@ -1,54 +1,49 @@
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: wordpress-pre
----
-apiVersion: v1
 kind: Secret
 metadata:
   name: root-secret
-  namespace: wordpress-pre
+  namespace: wordpress
 type: kubernetes.io/base64
 data:
-  root-password: M2MzbnV0MWMxMG4=
+  root-password: cjAyNz9sZSUtVzByZFByM3MhcCM1ZDIhPy1VZDN9ZQ==
 ---
 apiVersion: v1
 kind: Secret
 metadata:
   name: proyecto-secret
-  namespace: wordpress-pre
+  namespace: wordpress
 type: kubernetes.io/base64
 data:
-  proyecto-password: M2MzbnV0MWMxMG4=
+  proyecto-password: dXNlci1XMHJkUHIzc3AjNWQ/dy1VZDN9ZQ==
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: deploy-secret
-  namespace: wordpress-pre
+  name: phpmyadmin-secret
+  namespace: wordpress
 type: kubernetes.io/base64
 data:
-  deploy-password: M2MzbnV0MWMxMG4=
+  phpmyadmin-password: dXNlci1XMHJkUHIzc3AjNWQ/dy1VZDN9ZQ==
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: mysql-wordpress
-  namespace: wordpress-pre
+  name: mysql-wordpress #Name for mysql service must be the same here and in the SVC
+  namespace: wordpress #NAMESPACE
 spec:
-  serviceName: "mysql-service"
+  serviceName: "mysql-wordpress" #Name for mysql service
   replicas: 1
   selector:
     matchLabels:
-      app: mysql-wordpress
+      app: mysql-wordpress #Name for mysql service
   template:
     metadata:
       labels:
-        app: mysql-wordpress
+        app: mysql-wordpress  #Name for mysql service
     spec:
       containers:
-        - name: mysql-wordpress
-          image: mysql:8.1
+        - name: mysql-wordpress  #Name for mysql service
+          image: mysql:8.1  #Docker Image
           resources:
             requests:
               memory: "512Mi"
@@ -62,18 +57,20 @@ spec:
                 secretKeyRef:
                   name: root-secret
                   key: root-password
+            - name: TZ
+              value: "America/Chihuahua"
           ports:
             - containerPort: 3306
           volumeMounts:
-            - name: wordpress-mysql-pvc
+            - name: wordpress-mysql-pvc # REFERENCE: PVC NAME in storage yaml
               mountPath: /var/lib/mysql
-            - name: wordpress-scripts
+            - name: wordpress-mysql-scripts  #Reference NAME = 1
               mountPath: /docker-entrypoint-initdb.d
       volumes:
-        - name: wordpress-mysql-pvc
+        - name: wordpress-mysql-pvc # REFERENCE: PVC NAME in storage yaml
           persistentVolumeClaim:
-            claimName: wordpress-mysql-pvc
-        - name: wordpress-scripts
+            claimName: wordpress-mysql-pvc # REFERENCE: PVC NAME in storage yaml
+        - name: wordpress-mysql-scripts  #Reference NAME = 1
           configMap:
             name: import-wordpress-scripts
 ---
@@ -81,7 +78,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mysql-wordpress
-  namespace: wordpress-pre
+  namespace: wordpress
 spec:
   selector:
     app: mysql-wordpress
