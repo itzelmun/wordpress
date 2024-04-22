@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  namespace: wordpress-pre
+spec:
+  revisionHistoryLimit: 3
+  selector:
+   matchLabels:
+    app: wordpress
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      initContainers:
+      - name: init-chown
+        image: busybox
+        imagePullPolicy: Always
+        command:
+        - sh
+        - -c
+        - |
+          chown -R www-data:www-data /mnt/public_content &&
+          chown -R www-data:www-data /mnt/private_content &&
+          chmod -R 770 /mnt/public_content &&
+          chmod -R 770 /mnt/private_content
+        volumeMounts:
+        - name: public-content
+          mountPath: /mnt/public_content
+        - name: private-content
+          mountPath: /mnt/private_content
+      containers:
+      - name: wordpress
+        image: sistemasudec/wordpress:v1-pre
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        env:
+        - name: SOURCE
+          value: wordpress
+        - name: WORDPRESS_DB_HOST
+          value: mysql-wordpress
+        - name: WORDPRESS_DB_NAME
+          value: proyecto
+        - name: WORDPRESS_DB_USER
+          value: user
+        - name: WORDPRESS_DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: deploy-secret
+              key: deploy-password
+        - name: SIMPLE
+          value: simple-wordpress
+        volumeMounts:
+        - name: public-content
+          mountPath: /var/www/wordpress/public_content
+        - name: private-content
+          mountPath: /var/www/private_content
+      volumes:
+      - name: public-content
+        persistentVolumeClaim:
+          claimName: public-content-pvc
+      - name: private-content
+        persistentVolumeClaim:
+          claimName: private-content-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wordpress
+  namespace: wordpress-pre
+  labels:
+    app: wordpress
+spec:
+  selector:
+   app: wordpress
+  type: ClusterIP
+  ports:
+   - name: http
+     port: 80
+     protocol: TCP
+     targetPort: 80

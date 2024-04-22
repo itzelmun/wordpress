@@ -1,0 +1,92 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wordpress-pre
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: root-secret
+  namespace: wordpress-pre
+type: kubernetes.io/base64
+data:
+  root-password: M2MzbnV0MWMxMG4=
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: proyecto-secret
+  namespace: wordpress-pre
+type: kubernetes.io/base64
+data:
+  proyecto-password: M2MzbnV0MWMxMG4=
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: deploy-secret
+  namespace: wordpress-pre
+type: kubernetes.io/base64
+data:
+  deploy-password: M2MzbnV0MWMxMG4=
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-wordpress
+  namespace: wordpress-pre
+spec:
+  serviceName: "mysql-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-wordpress
+  template:
+    metadata:
+      labels:
+        app: mysql-wordpress
+    spec:
+      containers:
+        - name: mysql-wordpress
+          image: mysql:8.1
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1"
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: root-secret
+                  key: root-password
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: wordpress-mysql-pvc
+              mountPath: /var/lib/mysql
+            - name: wordpress-scripts
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: wordpress-mysql-pvc
+          persistentVolumeClaim:
+            claimName: wordpress-mysql-pvc
+        - name: wordpress-scripts
+          configMap:
+            name: import-wordpress-scripts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-wordpress
+  namespace: wordpress-pre
+spec:
+  selector:
+    app: mysql-wordpress
+  type: ClusterIP
+  ports:
+    - name: mysql-wordpress
+      port: 3306
+      targetPort: 3306
