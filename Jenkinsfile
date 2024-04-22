@@ -1,18 +1,19 @@
 pipeline {
     environment {
-        DOCKER_IMAGE_NAME1 = "sistemasudec/wordpress:v1-pre"
-        DOCKER_IMAGE_NAME2 = "sistemasudec/phpmyadmin:wordpress-pre"
+        DOCKER_IMAGE_NAME1 = "udeccolima/wordpress:simplesaml-pre"
+        DOCKER_IMAGE_NAME2 = "udeccolima/phpmyadmin:wordpress-pre"
         REGISTRY_CREDENTIAL = 'sistemasudec'
         SSH_CREDENTIAL = 'pre-key'
         REMOTE_USER = 'digesetuser'
-        REMOTE_HOST = '148.213.1.131'
+        REMOTE_HOST = '148.213.3.67'
         K8S_CLI = '/usr/local/bin/k0s kubectl'
         KUBECONFIG_PATH = '/home/digesetuser/.kube/config'
         DEPLOY_PATH = '/home/digesetuser/wordpress'
         JENKINS_URL = "jarvis.ucol.mx:8080"
-        SONAR_SCANNER_HOME = "/opt/sonar-scanner"
+        SONAR_SCANNER_HOME = "/opt/sonar-scanner-5.0.1.3006-linux/"
         PATH = "${env.SONAR_SCANNER_HOME}/bin:${env.PATH}"
 		PROJECT_FOLDER = "wordpress"
+        
     }
     
     agent any
@@ -23,22 +24,22 @@ pipeline {
             }
         }
 
-      /*  stage('Static Code Analysis') {
+        stage('Static Code Analysis') {
       		steps {
         		withSonarQubeEnv('sonarqube') {
          		sh "${env.SONAR_SCANNER_HOME}/bin/sonar-scanner \
-					-Dsonar.projectKey=ecenutricion \
-					-Dsonar.projectName=ecenutricion \
+					-Dsonar.projectKey=wordpress \
+					-Dsonar.projectName=wordpress \
 					-Dsonar.projectVersion=1.0 \
 					-Dsonar.sources=public-html \
 					-Dsonar.language=php \
 					-Dsonar.login=${sonarqubeGlobal} \
-					-Dsonar.host.url=http://scanner.ucol.mx:9000 \
+					-Dsonar.host.url=http://sonarqube-sonarqube-1:9000 \
 					-Dsonar.report.export.path=sonar-report.json"
         		}
       		}
    		}
-*/
+/*
     stage('Build and Push Image 1') {
     steps {
         script {
@@ -67,9 +68,6 @@ stage('Build and Push Image 2') {
 }
 
 
-
-
-
     stage('Kubernetes Deployments') {
       steps {
         script {
@@ -83,7 +81,7 @@ stage('Build and Push Image 2') {
             }
         }
       }
-    }
+    }*/
   }
     post {
         success {

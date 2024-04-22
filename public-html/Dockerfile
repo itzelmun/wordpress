@@ -1,4 +1,4 @@
-# Utiliza la imagen base de Ubuntu 22.04
+# Utiliza la imagen base de wordpress
 FROM wordpress:latest
 
 ENV ACCEPT_EULA=Y
@@ -8,38 +8,57 @@ RUN apt-get update && apt-get install -y nano wget gnupg2
 # Configura la zona horaria y evita las interacciones durante la construcción
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=America/Mexico_City
-
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+RUN apt-get update && apt-get install -y sudo
 
 # Configura las variables de entorno para configuración adicional
 ENV SOURCE=wordpress
-ENV WORDPRESS_DB_HOST=mysql-wordpress
-ENV WORDPRESS_DB_NAME=proyecto
-ENV WORDPRESS_DB_USER=user
-ENV WORDPRESS_DB_PASSWORD=psswrd-proyecto-user!
+ENV WORDPRESS_DB_HOST=mysql-wordpress-pre
+ENV WORDPRESS_DB_NAME=wordpress
+ENV WORDPRESS_DB_USER=wordpress
+ENV PASSD=user-W0rdPr3sp#5d?w-Ud3}e
 ENV SIMPLE=simple-wordpress
 
 # Configura el directorio de trabajo en el contenedor
-WORKDIR /var/www/html
+WORKDIR /var/www/wordpress
+COPY . /var/www/wordpress
 
-# Copia el contenido de los directorios públicos y privados
-COPY ./wp-config-sample.php /var/www/html/
-COPY ./wp-config-docker.php /var/www/html/
-COPY . /var/www/html
-
-# Configura WordPress (cambia las variables según tus necesidades)
+# Copiar archivos al contenedor
 RUN mkdir -p /var/www/wordpress/public_content
 RUN mkdir -p /var/www/private_content
 
 # Mueve el directorio 'simplesaml' a la ubicación correcta
-RUN mv /var/www/html/simplesaml /var/www/simplesaml
+RUN mv /var/www/wordpress/simplesaml /var/www/simplesaml
 
-# Configura los permisos de los directorios
-RUN chown -R www-data:www-data /var/www/html/ && \
-    chmod -R 755 /var/www/html/
-    
+# Descarga e instala WordPress en /srv/www usando curl y tar
+RUN curl -o /tmp/latest.tar.gz https://wordpress.org/latest.tar.gz \
+    && tar -zxvf /tmp/latest.tar.gz -C /var/www/wordpress \
+    && rm /tmp/latest.tar.gz
+
 # Enable session
 RUN echo "session.save_path=\"/tmp\"" >> /usr/local/etc/php/php.ini
+
+# Install xdebug driver
+RUN pecl install xdebug
+RUN docker-php-ext-enable xdebug
+#COPY ./config/xdebug/docker-php-ext-xdebug.ini /usr/local/etc/php/conf.d/
+
+
+# Install SqlServer PHP driver
+RUN cat /etc/os-release \
+  && apt-get update \
+  && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
+  && curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list \
+      > /etc/apt/sources.list.d/mssql-release.list \
+  && apt-get install -y --no-install-recommends apt-transport-https \
+  && apt-get update \
+  && ACCEPT_EULA=Y apt-get -y --no-install-recommends install unixodbc-dev msodbcsql17
+
+# Install PHP extensions
+RUN docker-php-ext-install calendar
+RUN docker-php-ext-install pdo_mysql \
+  && pecl install sqlsrv pdo_sqlsrv \
+  && docker-php-ext-enable sqlsrv pdo_sqlsrv
 
 # Copia el archivo de configuración de Apache
 COPY 000-default.conf /etc/apache2/sites-available/000-default.conf

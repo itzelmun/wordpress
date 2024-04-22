@@ -1,0 +1,42 @@
+# ingress.yml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: traefik-ingress-wordpress-pre
+  namespace: wordpress-pre
+  annotations:
+      traefik.ingress.kubernetes.io/router.middlewares: wordpress-pre-https-redirect@kubernetescrd, wordpress-pre-add-forwarded-proto@kubernetescrd
+spec:
+ ingressClassName: traefik
+ tls:
+ - hosts:
+   - pre-datacenter.ucol.mx
+   secretName: microbot-data
+ rules:
+
+  - host: "pre-datacenter.ucol.mx"
+    http:
+      paths:
+      - pathType: Prefix
+        path: /wordpress
+        backend:
+          service:
+            name: wordpress
+            port:
+              number: 80
+
+      - pathType: Prefix
+        path: /simple-wordpress
+        backend:
+          service:
+            name: wordpress
+            port:
+              number: 80
+
+      - pathType: Prefix
+        path: /admin-wordpress
+        backend:
+          service:
+            name: admin-wordpress
+            port:
+              number: 80

@@ -1,4 +1,4 @@
-name: CI/CD (preproduction)
+name: CI/CD (pre-production)
 
 on:
   push:
@@ -10,10 +10,10 @@ on:
     types: [closed]
 
 env:
-  DOCKER_IMAGE_NAME1: sistemasudec/wordpress:v1-pre
-  DOCKER_IMAGE_NAME2: sistemasudec/phpmyadmin:wordpress-pre
+  DOCKER_IMAGE_NAME1: udeccolima/wordpress:simplesaml-pre
+  DOCKER_IMAGE_NAME2: udeccolima/phpmyadmin:wordpress-pre
   REMOTE_USER: digesetuser
-  REMOTE_HOST: 148.213.1.131
+  REMOTE_HOST: 148.213.3.67
   DEPLOY_PATH: /home/digesetuser/wordpress
 
 jobs:
@@ -47,50 +47,83 @@ jobs:
       - name: Set up SSH Keys
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY_PRE }}
 
       - name: Copy Kubernetes Config Files
         run: |
-          scp -o StrictHostKeyChecking=no deployments/*.yaml ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:${{ env.DEPLOY_PATH }}
+          scp -o StrictHostKeyChecking=no deployments/pre/*.yaml ${{ env.REMOTE_USER }}@${{ env.REMOTE_HOST }}:${{ env.DEPLOY_PATH }}
+
+      - name: Setup Certificate Files
+        run: |
+          echo "${{ secrets.CERTIFICATE }}" > CRT_ucol.mx.txt
+          echo "${{ secrets.PRIVATE_KEY }}" > RSA_ucol.mx.txt
 
       - name: Apply Kubernetes storage
         uses: myrotvorets/kubectl-action@2.0.0
         with:
-            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
             version: latest
-            args: apply -f deployments/storage-pre.yaml --timeout=120s
+            args: apply -f deployments/pre/storage-pre.yaml --timeout=120s
+
+      - name: Apply Kubernetes configmap
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
+            version: latest
+            args: apply -f deployments/pre/configmap-pre.yaml --timeout=120s
 
       - name: Apply Kubernetes satefulset
         uses: myrotvorets/kubectl-action@2.0.0
         with:
-            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
             version: latest
-            args: apply -f deployments/statefulset-pre.yaml --timeout=120s
+            args: apply -f deployments/pre/statefulset-pre.yaml --timeout=120s
+
+      - name: Delete Docker-Secret in Pre
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
+            version: latest
+            args: delete secret my-docker-credentials -n wordpress-pre
+
+      - name: Delete Secret Microbot-data in Pre
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
+            version: latest
+            args: delete secret microbot-data -n wordpress-pre
+
+      - name: Creating certificates and Ingresses (Pre)
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
+            version: latest
+            args: create secret tls microbot-data --cert=CRT_ucol.mx.txt --key=RSA_ucol.mx.txt -n wordpress-pre
+
+      - name: Creating Docker-Secret (Pre)
+        uses: myrotvorets/kubectl-action@2.0.0
+        with:
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
+            version: latest
+            args: create secret docker-registry my-docker-credentials --docker-server=https://index.docker.io/v1/ --docker-username=${{ secrets.DOCKER_USERNAME }} --docker-password=${{ secrets.DOCKER_PASSWORD }} --docker-email=sistemas@ucol.mx -n wordpress-pre
 
       - name: Apply Kubernetes deployments
         uses: myrotvorets/kubectl-action@2.0.0
         with:
-            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
             version: latest
-            args: apply -f deployments/ --timeout=120s
-      
-      - name: Apply Kubernetes configmap
-        uses: myrotvorets/kubectl-action@2.0.0
-        with:
-            config: ${{ secrets.KUBE_CONFIG_DATA }}
-            version: latest
-            args: apply -f deployments/configmap-pre.yaml --timeout=120s
+            args: apply -f deployments/pre --timeout=120s
 
       - name: Restart Deployment
         uses: myrotvorets/kubectl-action@2.0.0
         with:
-            config: ${{ secrets.KUBE_CONFIG_DATA }}
+            config: ${{ secrets.KUBE_CONFIG_DATA_PRE }}
             version: latest
             args: rollout restart deployment wordpress -n wordpress-pre
 
       - name: Notify Success on Slack
         if: success()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v1.25.0
         with:
             channel-id: 'C06HDV6HZLG' # channel name
             slack-message: "✅ *${{ github.workflow }}* workflow SUCCEEDED for ${{ github.repository }}. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>\nGitHub build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
@@ -99,7 +132,7 @@ jobs:
 
       - name: Notify Failure on Slack
         if: failure()
-        uses: slackapi/slack-github-action@v1.24.0
+        uses: slackapi/slack-github-action@v1.25.0
         with:
             channel-id: 'C06HDV6HZLG' # channel name
             slack-message: "❌ *${{ github.workflow }}* workflow FAILED for ${{ github.repository }}. <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Workflow Run>\nGitHub build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
